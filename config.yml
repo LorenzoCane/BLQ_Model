@@ -1,0 +1,28 @@
+#Configuration file
+
+#Dir and path
+Dir:
+  cl_dir: './cl_data/'
+  clim_data_dir: './data/raw/'
+  clean_data_dir: './data/processed/'
+  results_dir: './results/'
+  img_dir: './results/img'
+  output_dir: './results/output'
+
+#Aircraft specifications
+Aircraft:
+  aircr_name: 'A320'
+  aircr_engine: 'V2500-A1'
+
+#Airport specifications (try to autom via airportsdata)
+Airport:
+  airport_code: 'LGHI' #London =  EGLL , Bruxells =  EBBR, Pantelleria = LICG
+
+#Climate data selection
+Climate:
+  model: 'ACCESS-ESM1-5' #UKESM1-0-LL or ACCESS-ESM1-5
+  months: [ 6, 7, 8 ] # month(s) number
+
+#Mass limitation:
+Mass:
+  passenger_mass: 86.0 #kg

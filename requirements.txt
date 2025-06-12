@@ -1,0 +1,8 @@
+airportsdata==20250224
+numpy==2.3.0
+openap==2.2
+pandas==2.3.0
+pyarrow==19.0.1
+PyYAML==6.0.2
+PyYAML==6.0.2
+tqdm==4.66.5
