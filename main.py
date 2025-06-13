@@ -24,7 +24,7 @@ warnings.filterwarnings('ignore') #to exclude sns warning
 
 #***************************************************************************
 #Phases
-CL_FINDER = True
+CL_FINDER = False
 
 #***************************************************************************
 #import from configuration file config.yml & create dirs
@@ -64,7 +64,7 @@ os.makedirs(output_dir, exist_ok=True)
 # #Perform C_L evaluation if needed or request
 cl_parquet_path = os.path.join(cl_path, f"cl_{aircraft_name}_{engine_name}_TODR_data.parquet")
 
-if CL_FINDER or not os.path.exists(cl_parquet_path):
+if any([CL_FINDER, not os.path.exists(cl_parquet_path)]):
     print('==========================================================')
     print("Parquet file not found. Running CL evaluation script...")
     subprocess.run(["python", "cl_calc.py"], stdout=subprocess.DEVNULL)  

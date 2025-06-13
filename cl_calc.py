@@ -5,7 +5,7 @@ import pyarrow.parquet as pq
 import os
 import sys
 from config_loader import load_config
-from todr import cl_finder, take_off
+from performanc_functions import cl_finder, take_off
 from aircraft_utils import get_aircraft_data, get_thrust, get_to_speed
 from constants import *
 from openap import prop #aircraft and engine-related data
@@ -62,7 +62,7 @@ print(np.min(cl_values))
 
 #final results
 cl_best = cl_val
-err_cl_best = err_cl
+err_cl_best = 0.01
 
 print(f"C_l finding process results: C_l = {cl_best} +- {err_cl_best}")
 
@@ -71,6 +71,19 @@ model_to_dist = np.array([take_off(i, rho_isa, cl_best, cd0, k, wing_area, airbo
                                    aircraft_name, engine_name, MARGIN_COEFF, mu=mu) for i in aircraft_mass])
 perc_diff = (model_to_dist - to_manuf_value) / to_manuf_value * 100.0
 
+# Upper and lower errors from cl uncertainty
+model_upper = np.array([
+    take_off(m, rho_isa, cl_best - err_cl_best, cd0, k, wing_area, airborne_dist,  aircraft_name, engine_name, MARGIN_COEFF, mu=mu)
+    for m in aircraft_mass
+])
+model_lower = np.array([
+    take_off(m, rho_isa, cl_best + err_cl_best, cd0, k, wing_area, airborne_dist, aircraft_name, engine_name, MARGIN_COEFF, mu=mu)
+    for m in aircraft_mass
+])
+
+#Compute errors
+model_err_upper = abs(model_upper - model_to_dist)
+model_err_lower = abs(model_to_dist - model_lower)
 '''
 print('-------------------------------------------------')
 print('Perc. difference between Manufacturer and model values:' )
@@ -86,6 +99,8 @@ df = pd.DataFrame({
     "mass_tonnes": aircraft_mass / 1000.,
     "todr_manufacturer": to_manuf_value,
     "todr_model": model_to_dist,
+    "todr_model_err_upper": model_err_upper,
+    "todr_model_err_lower": model_err_lower,
     "todr_manufacturer_err": to_err,
 })
 
