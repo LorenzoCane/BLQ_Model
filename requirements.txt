@@ -1,4 +1,5 @@
 airportsdata==20250224
+matplotlib==3.10.3
 numpy==2.3.0
 openap==2.2
 pandas==2.3.0

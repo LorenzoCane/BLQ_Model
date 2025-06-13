@@ -345,4 +345,4 @@ def mtom_binary(runway_length, initial_mass, alt_ft, aircraft_name, engine_name,
 
         iteration += 1
 
-    return low  # Conservative estimate
+    return low  # Conservative estimat
