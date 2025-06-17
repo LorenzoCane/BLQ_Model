@@ -19,3 +19,5 @@ ISA_TEMP = 288.15 #K
 ISA_PR = 101325 #Pa
 ISA_ALT = 0.0 #m  
 
+FIX_HUM = 50.0 #%
+FIX_HW = 0.0 #m/s

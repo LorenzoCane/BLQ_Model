@@ -21,6 +21,7 @@ Grid:
   wind_min: 0.0 #m/s
   wind_max: 13.0 #m/s
   wind_step: 1.0 #m/s
+  fixed_params: [ "Humidity", "Pressure" ] #allowed keywords : "Temperature" ,"Headwind", "Humidity", "Pressure"
 
 #Aircraft specifications
 Aircraft:

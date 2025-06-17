@@ -19,7 +19,7 @@ from constants import *
 import numpy as np
 import os
 import yaml
-import tqdm
+from tqdm import tqdm
 import pyarrow.parquet as pq
 import warnings
 warnings.filterwarnings('ignore') #to exclude sns warning
@@ -27,7 +27,7 @@ import subprocess
 from multiprocessing import Pool, cpu_count
 from itertools import product
 
-from performanc_functions import take_off
+from performanc_functions import take_off, calc_todr
 from airport_utils import *
 from aircraft_utils import *
 from atm_functions import compute_air_density
@@ -36,6 +36,14 @@ from atm_functions import compute_air_density
 #Phases
 CL_FINDER = False
 
+#Fixed values dict (use if ph quantinty is fixed)
+fixed_values = {
+    "Temperature" : ISA_TEMP,
+    "Headwind" : FIX_HW,
+    "Humidity" : FIX_HUM, 
+    "Pressure" : ISA_PR
+}
+allowed_keys =  fixed_values.keys()
 #***************************************************************************
 #import from configuration file config.yml & create dirs
 config_file = 'config.yml'
@@ -66,6 +74,22 @@ temp_arr = np.arange(grid['temp_min'], grid['temp_max'] + 0.1, grid['temp_step']
 pres_arr = np.arange(grid['pres_min'], grid['pres_max'] + 1, grid['pres_step'])
 hum_arr  = np.arange(grid['hum_min'],  grid['hum_max'] + 0.1, grid['hum_step'])
 wind_arr = np.arange(grid['wind_min'], grid['wind_max'] + 0.1, grid['wind_step'])
+#Dict of all the arrays
+param_arrays = {"Temperature": temp_arr,
+                "Pressure": pres_arr,
+                "Humidity": hum_arr,
+                "Headwind": wind_arr
+            }
+#fixed and varying params
+fixed_params = grid['fixed_params']
+varying_params = [key for key in allowed_keys if key not in fixed_params]
+
+#Check that all params are allowed keys
+if not all(key in allowed_keys for key in fixed_params):
+    invalid_keys = [key for key in fixed_params if key not in allowed_keys]
+    raise NameError(f"Invalid keys found in fixed_params: {invalid_keys}")
+if not len(fixed_params) == 2:
+    raise ValueError(f'fixed_params len must be 2, {len(fixed_params)} found.')
 
 temp_dim = len(temp_arr)
 press_dim = len(pres_arr)
@@ -100,7 +124,7 @@ cl_parquet_path = os.path.join(cl_path, f"cl_{aircraft_name}_{engine_name}_TODR_
 
 if any([CL_FINDER, not os.path.exists(cl_parquet_path)]):
     print('==========================================================')
-    print("Parquet file not found. Running CL evaluation script...")
+    print("Parquet file not found. Running C_L evaluation script...")
     subprocess.run(["python", "cl_calc.py"], stdout=subprocess.DEVNULL)  
     print('==========================================================')
    
@@ -122,28 +146,44 @@ else:
 #***************************************************************************
 # GRID CALCULATION
 
-#Create grid
-param_grid = list(product(temp_arr, pres_arr, hum_arr, wind_arr))
+#Create grid with the varying params
+param_grid = list(product(param_arrays[varying_params[0]], param_arrays[varying_params[1]]))
 len_grid = len(param_grid)
+
+selected_fix_val = {key: fixed_values[key] for key in fixed_params }
 
 print(sep)
 print("Parameters grid successfully created.")
+print(f'Varying params: {varying_params[0]} and {varying_params[1]}')
+print(f'Fixed params: {selected_fix_val}')
 print(f'Dimension of the grid : {len_grid}')
+
+
 #Define worker function
 def worker(params):
-    temp, press, hum, h_wind = params
-    #compute air density
-    rho = compute_air_density(temp, press, hum) #kg m^-3
-    #compute TODR
-    todr = take_off(m=mass_max, cl=cl_best, rho=rho, cd0=cd0, k=k, w_area=wing_area,
-        airborne_d=airborne_dist, aircraft_name=aircraft_name, engine_name=engine_name,
-        alt_ft=airport_elev, head_wind=h_wind )
+    p1_val, p2_val = params
+    param_dict = {
+        varying_params[0]: p1_val,
+        varying_params[1]: p2_val,
+        **selected_fix_val
+    }
+
+    # Compute air density
+    rho = compute_air_density(
+        temp_c=param_dict["Temperature"],
+        press_pa=param_dict["Pressure"],
+        rh_perc=param_dict["Humidity"]
+    )
+
+    # Compute TODR
+    todr = calc_todr(m=mass_max, rho=rho, cl=cl_best, cd0=cd0, k=k, w_area=wing_area,
+                     airborne_d=airborne_dist, aircraft_name=aircraft_name, engine_name=engine_name,
+                     alt_ft=airport_elev, head_wind=param_dict["Headwind"])
 
     return {
-        "Temperature": temp,
-        "Headwind": h_wind,
-        "Pressure": press,
-        "Humidity": hum,
+        varying_params[0]: p1_val,
+        varying_params[1]: p2_val,
+        **selected_fix_val,
         "AirDensity": rho,
         "TODR": todr
     }
@@ -152,12 +192,16 @@ def worker(params):
 
 
 if __name__ == '__main__':
-    with Pool(processes=cpu_count()) as pool:
+    with Pool(cpu_count()) as pool:
         results = list(tqdm(pool.imap_unordered(worker, param_grid),
                             total=len(param_grid),
-                            desc="Computing Grid"
-                            ))
+                            desc=f"Computing Grid: {varying_params[0]} vs {varying_params[1]}",
+                            leave=True
+                            )
+                        )
 
     df = pd.DataFrame(results)
-    df.to_parquet(f"{aircraft_name}_{engine_name}_perf_grid.parquet", index=False)
+    output_name = f"todr_grid_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.parquet"
+    output_path = os.path.join(output_dir, output_name)
+    df.to_parquet(output_path, index=False)
     print(df.head())

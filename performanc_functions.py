@@ -4,7 +4,10 @@ from unit_converter import ComplexUnitConverter as conv
 from tools import rmsd
 import numpy as np
 
+from aircraft_utils import get_thrust
+from constants import *
 from openap.thrust import Thrust #thrust calc
+
 
 def take_off(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name, 
              alt_ft= 0.0, head_wind = 0.0, margin_coeff=1.15, 
@@ -119,96 +122,145 @@ def take_off(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name,
     return final_distance
 
 
+def calc_todr(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name, 
+             alt_ft= 0.0, head_wind = 0.0, margin_coeff=1.15, 
+             mu=0.017, theta=0., dv0 = 0.01, v_max = 200.0, complete_data = False):
+    
+    theta = conv.convert(theta, 'deg', 'rad')
+    cd = cd0 + k * cl* cl
+    weight = m * G
+    
+    #speeds used in the calc
+    ground_speeds_ms = np.arange(0.0, v_max, step=dv0) #m/s
+    #TAS 
+    tas_ms = np.array([x + head_wind for x in ground_speeds_ms]) #m/s
+    #create a dict to store performance related values
+    data_dict = {}
+
+    #Populate dict with thrust, drag , weight , acceleration values
+    data_dict["thr"] = get_thrust(aircraft_name=aircraft_name, engine_name=engine_name, speeds_ms=tas_ms, alt_ft=alt_ft)
+    data_dict["D"] = 0.5 * rho * tas_ms**2 * w_area * cd
+    data_dict["L"] = 0.5 * rho * tas_ms**2 * w_area * cl
+    data_dict["W"] = weight
+    data_dict["a"] = (data_dict["thr"] -  data_dict["D"] - mu * (weight * np.cos(theta) - data_dict['L']) - weight * np.sin(theta)) / m
+    
+    #store useful data
+    data_dict['deltav'] = dv0
+    data_dict["Vtas"] = tas_ms
+
+    #Min TAS when L > W
+    data_dict["index"] = (np.where(data_dict['L'] > data_dict['W'])[0][0])
+
+    #Calc Delta x for todr integral calc
+    
+    deltax = []
+
+    for i in np.arange(1, len(ground_speeds_ms[0 : (data_dict["index"]+3)])):
+        deltax.append(
+            (ground_speeds_ms[i] + ground_speeds_ms[i-1]) * dv0 / (data_dict['a'][i] + data_dict['a'][i-1]) # 2.0 division between means have been erased       
+            )
+    data_dict["deltax"] = deltax
+
+    #Calc ground segment distance
+    data_dict["x"] = np.cumsum(deltax)[data_dict['index']] #m
+
+    #TODR as ground segment + airborne distance * security margin coefficient
+    data_dict['TODR'] = ( data_dict['x'] + airborne_d ) * margin_coeff
+
+    return data_dict if complete_data else data_dict['TODR']
+
+
 def cl_finder(aircraft_name, engine_name, aircraft_mass, to_manuf_value, rho_isa, 
-                cd_0, k_p, wing_area, airborne_dist, safe_margin_coeff,
-                mu, dv0=0.01, dv_decay='const', theta= 0., cl_min=1.0, cl_max=2.0, cl_step=0.01):
+              cd_0, k_p, wing_area, airborne_dist, safe_margin_coeff,
+              mu, dv0=0.01, theta=0., cl_min=1.0, cl_max=2.0, cl_step=0.01):
     '''
-     Performs a grid search to estimate the best-fit lift coefficient (C_L)
-     that minimizes the RMSD between model-predicted and manufacturer-provided
-     take-off distance data for a given aircraft mass.
+    Grid search to find the optimal lift coefficient C_L that minimizes the RMSD
+    between model-based TODR (using calc_todr) and manufacturer values.
 
-     The function supports two modes:
-     - Original take-off model: Lift-off occurs when L ≥ W × lift_frac
-     - Modified take-off model: Lift-off occurs at speed where |L - W| is minimized
+    Parameters
+    ----------
+    aircraft_name : str
+        Name of the aircraft model.
+    engine_name : str
+        Name of the engine model.
+    aircraft_mass : array-like
+        Aircraft mass values in kg.
+    to_manuf_value : array-like
+        Manufacturer take-off distances in meters.
+    rho_isa : float
+        Air density in kg/m³.
+    cd_0 : float
+        Zero-lift drag coefficient.
+    k_p : float
+        Induced drag factor.
+    wing_area : float
+        Wing area in m².
+    airborne_dist : float
+        Airborne segment in meters.
+    safe_margin_coeff : float
+        Safety margin multiplier.
+    mu : float
+        Friction coefficient.
+    dv0 : float, optional
+        Speed resolution for TODR integration.
+    theta : float, optional
+        Runway slope (degrees).
+    cl_min, cl_max : float
+        Bounds of the C_L grid.
+    cl_step : float
+        Grid step.
 
-     Parameters
-     ----------
-     aircraft_mass : array-like
-         Array of aircraft masses in kg.
-     to_manuf_value : array-like
-         Manufacturer-provided take-off distances corresponding to aircraft_mass.
-     to_err : array-like
-         Uncertainty on take-off measurements.
-     thr : float
-         Thrust in newtons.
-     rho_isa : float
-         Air density in kg/m^3.
-     cd_0 : float
-         Zero-lift drag coefficient.
-     k_p : float
-         Induced drag factor.
-     wing_area : float
-         Wing area in m^2.
-     airborne_dist : float
-         Post-liftoff distance (airborne segment) in meters.
-     safe_margin_coeff : float
-         Safety margin multiplier applied to total distance.
-     v_takeoff : float
-         Maximum take-off velocity (used to build velocity grid).
-     mu : float
-         Rolling friction coefficient.
-     dv0 : float, optional
-         Velocity step size (default: 0.01 m/s).
-     dv_decay : str, optional
-         Placeholder for decay strategy (not used).
-     theta : float, optional
-         Runway slope angle in degrees (default: 0°).
-     cl_min, cl_max : float
-         Minimum and maximum C_L values to test.
-     cl_step : float
-         Step size for C_L values.
-     modified : bool, optional
-         Whether to use the modified take-off model (default: False).
-
-     Returns
-     -------
-     best_cl_guess : float
-         Lift coefficient value yielding the lowest RMSD.
-     dummy_error : float
-         Placeholder for uncertainty (currently set to 0.1).
+    Returns
+    -------
+    best_cl_guess : float
+        Best estimate for the lift coefficient.
+    dummy_error : float
+        Placeholder for uncertainty (currently 0.1).
     '''
-    
-    fixed_params = dict(
-                        rho=rho_isa,
-                        cd0=cd_0,
-                        k=k_p,
-                        w_area=wing_area,
-                        airborne_d = airborne_dist,
-                        aircraft_name = aircraft_name,
-                        engine_name = engine_name,
-                        alt_ft = 0.0,
-                        margin_coeff = safe_margin_coeff,
-                        mu=mu,
-                        theta=theta,
-                        lift_frac=1.0, 
-                        vel_break = False,
-                        dv0= 0.01,
-                        dv_decay= dv_decay
-                    )
-    
-    # Grid search:
+
     cl_candidates = np.arange(cl_min, cl_max + cl_step, cl_step)
+    predicted_todr = []
 
-    rmsd_values = [
-            rmsd(take_off, aircraft_mass, to_manuf_value, cl=cl_val, **fixed_params)
-            for cl_val in cl_candidates
-            ]
-    #print(rmsd_values)
+    for cl_val in cl_candidates:
+        todr_list = []
+        for m, to_ref in zip(aircraft_mass, to_manuf_value):
+            try:
+                todr = calc_todr(
+                    m=m,
+                    rho=rho_isa,
+                    cl=cl_val,
+                    cd0=cd_0,
+                    k=k_p,
+                    w_area=wing_area,
+                    airborne_d=airborne_dist,
+                    aircraft_name=aircraft_name,
+                    engine_name=engine_name,
+                    alt_ft=0.0,
+                    head_wind=0.0,
+                    margin_coeff=safe_margin_coeff,
+                    mu=mu,
+                    theta=theta,
+                    dv0=dv0,
+                    v_max=200.0,
+                    complete_data=False
+                )
+                todr_list.append(todr)
+            except Exception as e:
+                print(f"Error at cl={cl_val:.3f}, m={m:.0f}: {e}")
+                todr_list.append(np.nan)
 
-    best_cl_guess = cl_candidates[np.argmin(rmsd_values)]
-    print(f"Best candidate C_l from grid search: {best_cl_guess:.3f} "
-          f"with RMSD = {min(rmsd_values):.2f}")
-    
+        predicted_todr.append(todr_list)
+
+    # Compute RMSD for each CL candidate
+    predicted_todr = np.array(predicted_todr)
+    diffs = predicted_todr - np.array(to_manuf_value)
+    rmsd_vals = np.sqrt(np.nanmean(diffs**2, axis=1))
+
+    best_idx = np.nanargmin(rmsd_vals)
+    best_cl_guess = cl_candidates[best_idx]
+
+    print(f"Best C_L: {best_cl_guess:.3f} | RMSD: {rmsd_vals[best_idx]:.2f}")
+
     return best_cl_guess, 0.1
 
 

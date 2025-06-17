@@ -43,11 +43,11 @@ def get_to_speed(aircraft_name):
     return speed_val
 
 #***************************************************************************
-def get_thrust(aircraft_name, engine_name, alt_m):
-    to_speed = get_to_speed(aircraft_name)
+def get_thrust(aircraft_name, engine_name, speeds_ms, alt_ft):
+    #to_speed = get_to_speed(aircraft_name)
 
     thr = Thrust(ac= aircraft_name, eng= engine_name)
-    T = np.array([thr.takeoff(tas = conv.convert(sp, 'ms', 'kts'), alt=conv.convert(alt_m, 'm', 'ft')) for sp in to_speed]) #N conv
+    T = np.array([thr.takeoff(tas = conv.convert(sp, 'ms', 'kts'), alt=alt_ft) for sp in speeds_ms]) #N conv
 
     return T
 
