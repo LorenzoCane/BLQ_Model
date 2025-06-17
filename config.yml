@@ -9,7 +9,7 @@ Dir:
   output_dir: './results/output'
 
 Grid:
-  temp_min: -17 #˚C
+  temp_min: -15 #˚C
   temp_max: 40.0 #˚C
   temp_step: 5.0 #˚C
   pres_min: 80000 #Pa
@@ -17,7 +17,7 @@ Grid:
   pres_step: 250 #Pa
   hum_min: 0.0 #%
   hum_max: 100 #%
-  hum_step: 5.0 #%
+  hum_step: 10.0 #%
   wind_min: 0.0 #m/s
   wind_max: 13.0 #m/s
   wind_step: 1.0 #m/s

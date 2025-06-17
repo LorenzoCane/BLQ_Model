@@ -89,9 +89,7 @@ def take_off(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name,
         #print(f'D = {D}')
         if L >= weight * lift_frac:
             break
-        if all([vel_break, ground_speed >= v_to]):
-            break
-  
+
         dv=dv0
         a_current = (thrust - D - mu * (weight * np.cos(theta) - L) - weight * np.sin(theta)) / m
         
@@ -118,7 +116,7 @@ def take_off(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name,
         d += dx
 
     final_distance = (d + airborne_d) * margin_coeff
-    return (final_distance, ground_speed) if return_velocity else final_distance
+    return final_distance
 
 
 def cl_finder(aircraft_name, engine_name, aircraft_mass, to_manuf_value, rho_isa, 

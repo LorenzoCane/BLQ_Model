@@ -19,6 +19,7 @@ from constants import *
 import numpy as np
 import os
 import yaml
+import tqdm
 import pyarrow.parquet as pq
 import warnings
 warnings.filterwarnings('ignore') #to exclude sns warning
@@ -65,6 +66,11 @@ temp_arr = np.arange(grid['temp_min'], grid['temp_max'] + 0.1, grid['temp_step']
 pres_arr = np.arange(grid['pres_min'], grid['pres_max'] + 1, grid['pres_step'])
 hum_arr  = np.arange(grid['hum_min'],  grid['hum_max'] + 0.1, grid['hum_step'])
 wind_arr = np.arange(grid['wind_min'], grid['wind_max'] + 0.1, grid['wind_step'])
+
+temp_dim = len(temp_arr)
+press_dim = len(pres_arr)
+hum_dim = len(hum_arr)
+wind_dim = len(wind_arr)
 
 #airborne dist
 asc_m = conv.convert(ASC, 'ft', 'm') # m
@@ -118,10 +124,14 @@ else:
 
 #Create grid
 param_grid = list(product(temp_arr, pres_arr, hum_arr, wind_arr))
+len_grid = len(param_grid)
 
+print(sep)
+print("Parameters grid successfully created.")
+print(f'Dimension of the grid : {len_grid}')
 #Define worker function
 def worker(params):
-    temp, h_wind, press, hum = params
+    temp, press, hum, h_wind = params
     #compute air density
     rho = compute_air_density(temp, press, hum) #kg m^-3
     #compute TODR
@@ -140,13 +150,14 @@ def worker(params):
 
 #Parallel execution
 
+
 if __name__ == '__main__':
     with Pool(processes=cpu_count()) as pool:
-        results = pool.map(worker, param_grid)
+        results = list(tqdm(pool.imap_unordered(worker, param_grid),
+                            total=len(param_grid),
+                            desc="Computing Grid"
+                            ))
 
-        #Save results as parquet
-        df = pd.DataFrame(results)
-        df.to_parquet(f"{aircraft_name}_{engine_name}_perf_grid.parquet", index=False)
-
-        #Check 
-        print(df.head())
+    df = pd.DataFrame(results)
+    df.to_parquet(f"{aircraft_name}_{engine_name}_perf_grid.parquet", index=False)
+    print(df.head())
