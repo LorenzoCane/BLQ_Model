@@ -1,3 +1,22 @@
+"""
+    Atmospheric condition functions
+
+    This module provides functions to retrive saturated vapor pressure and moist air density.
+    It depends on custom 'unit_converter' for unit handling and on custom constant lists.
+
+    Functions:
+    - satur_vapor_pres: Return the saturated vapor pressure of water using the Arden Buck
+    equation, with separate coefficients for temperatures above and below freezing.
+
+    - compute_air_density: Return the density of moist air based on the ideal gas law for
+    dry air and water vapor, taking into account air temperature, atmospheric pressure, and
+    relative humidity.
+
+    Author: Lorenzo Cane - DBL E&E Area Consultant
+    Last modified: 20/06/2025
+"""
+
+
 import numpy as np
 import sys
 from constants import *
@@ -6,17 +25,17 @@ from unit_converter import ComplexUnitConverter as conv
 
 def satur_vapor_pres(temp_c):
     '''
-     Calculate saturated vapour pressure of water (https://en.wikipedia.org/wiki/Vapour_pressure_of_water), using
-     A. Buck equation (https://en.wikipedia.org/wiki/Arden_Buck_equation).
+        Calculate saturated vapour pressure of water (https://en.wikipedia.org/wiki/Vapour_pressure_of_water), using
+        A. Buck equation (https://en.wikipedia.org/wiki/Arden_Buck_equation).
      
-     Parameters:
-     -----------
-     temp_c : float
-              Air temperature in degree Celsius
+        Parameters:
+        ----------
+        temp_c : float
+                Air temperature in ˚C
 
-     Returns:
-     --------
-     float : saturated vapour pressure at the given temperature, in kPa
+        Returns:
+    --------
+        float : saturated vapour pressure at the given temperature, in kPa
     '''
     #Select the coefficients based on temperature as suggested by the author
     coeff_list = (0.61121, 18.678, 234.5, 257.14) if temp_c >= 0 else (0.61115, 23.036, 333.7, 279.82)
@@ -29,20 +48,24 @@ def satur_vapor_pres(temp_c):
 
 def compute_air_density(temp_c, press_pa, rh_perc):
     '''
-     Compute air density at given level of temperature, pressure, andrelative humidity
+        Compute air density at given level of temperature, pressure, andrelative humidity
 
-     Parameters:
-     -----------
-     temp_c : float
-              Air temperature in degree Celsius
-     press_pa : float
-              Air pressure in Pa
-     rh_perc : float
-              Relative humidity of air , as percentage
+        Parameters:
+        ----------
+        temp_c : float
+                Air temperature in ˚C
+        press_pa : float
+                Air pressure in Pa
+        rh_perc : float
+                Relative humidity of air , as percentage
 
-     Returns:
-     --------
-     float : air density [kg m^-3]
+        Returns:
+        --------
+        float : air density [kg m^-3]
+
+        Raises:
+        --------
+        ValueError: If the relative humidity value is invalid (out of the [0-100] range).
     ''' 
 
     temp_k = conv.convert(temp_c, 'celsius', 'kelvin') #K

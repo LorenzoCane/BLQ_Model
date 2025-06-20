@@ -1,3 +1,24 @@
+"""
+    Performance functions
+
+    This module contains functions to simulate aircraft take-off dynamics and compute related performance metrics, 
+    such as the take-off distance required (TODR) and the Maximum Take-Off Mass (MTOM), using a physics-based approach.
+
+    It provides:
+    - Numerical simulation of the take-off ground roll (`take_off`)
+    - Estimation of take-off distance required under given conditions (`calc_todr`)
+    - Grid search to calibrate lift coefficient from manufacturer data (`cl_finder`)
+    - Mass estimation to satisfy take-off constraints for given runway length (`mtom`)
+
+    The module integrates aerodynamic models with engine performance data from OpenAP,
+    and is designed to support climate impact studies on aircraft performance.
+
+    It depends on project-specific utility modules: `unit_converter`, `tools`, `aircraft_utils`, `constants`
+
+    Author: Lorenzo Cane - DBL E&E Area Consultant
+    Last modified: 20/06/2025
+"""
+
 import sys 
 sys.path.insert(0, './utils')
 from unit_converter import ComplexUnitConverter as conv
@@ -13,61 +34,61 @@ def take_off(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name,
              alt_ft= 0.0, head_wind = 0.0, margin_coeff=1.15, 
              mu=0.017, theta=0., lift_frac=1.0, v_to=74.5, vel_break = False, return_velocity=False, dv0 = 0.01, dv_decay = 'const'):
     '''
-     Simulates the ground roll phase of an aircraft's take-off run and estimates 
-     the total take-off distance required (TODR), including the airborne distance.
+        Simulates the ground roll phase of an aircraft's take-off run and estimates 
+        the total take-off distance required (TODR), including the airborne distance.
 
-     Parameters:
-     -----------
-     m : float
-         Aircraft mass in kilograms.
-     thrust : float
-         Engine thrust in newtons.
-     rho : float
-         Air density in kg/m^3.
-     cl : float
-         Lift coefficient (assumed constant).
-     cd0 : float
-         Zero-lift drag coefficient.
-     k : float
-         Induced drag factor.
-     w_area : float
-         Wing area in m^2.
-     airborne_d : float
-         Airborne distance in meters (after lift-off).
-     aircraft_name : str
-         Name of the aircraft selected.
-     engine_name : str 
-         Specific engine used by the selected aircraft.
-     alt_ft : float
-         Altitude of the airport in ft ASL. 
-     head_wind: float, optional 
-         head winf velocity in m/s
-     margin_coeff : float, optional
-         Safety margin multiplier applied to the total distance. Default is 1.15.
-     mu : float, optional
-         Rolling friction coefficient. Default is 0.017.
-     theta : float, optional
-         Runway slope angle in degrees (positive for uphill). Default is 0°.
-     lift_frac : float, optional
-         Fraction of weight that must be supported by lift to initiate rotation. Default is 1.0.
-     v_to : float, optional
-         Target take-off velocity in m/s. Used only if `vel_break=True`. Default is 74.5 m/s.
-     vel_break : bool, optional
-         If True, terminates ground roll when velocity reaches `v_to`, regardless of lift. Default is False.
-     return_velocity : bool, optional
-         If True, returns a tuple (take-off distance, lift-off velocity). Default is False.
-     dv0 : float, optional
-        Base velocity increment (m/s) for simulation time steps. Default is 0.01 m/s.
-     dv_decay : str, optional
-         Strategy for reducing dv as velocity increases. Options: 
-         'const' (constant dv), 'exp' (exponential decay), 
-         'exp+' (stronger exponential), 'inv' (inverse). Default is 'const'.
+        Parameters:
+        -----------
+        m : float
+            Aircraft mass in kg.
+        thrust : float
+            Engine thrust in N.
+        rho : float
+            Air density in kg/m^3.
+        cl : float
+            Lift coefficient (assumed constant).
+        cd0 : float
+            Zero-lift drag coefficient.
+        k : float
+            Induced drag factor.
+        w_area : float
+            Wing area in m^2.
+        airborne_d : float
+            Airborne distance in meters (after lift-off).
+        aircraft_name : str
+            Name of the aircraft selected.
+        engine_name : str 
+            Specific engine used by the selected aircraft.
+        alt_ft : float
+            Altitude of the airport in ft ASL. 
+        head_wind: float, optional 
+            Head wind velocity in m/s.
+        margin_coeff : float, optional
+            Safety margin multiplier applied to the total distance. Default is 1.15.
+        mu : float, optional
+            Rolling friction coefficient. Default is 0.017.
+        theta : float, optional
+            Runway slope angle in degrees (positive for uphill). Default is 0°.
+        lift_frac : float, optional
+            Fraction of weight that must be supported by lift to initiate rotation. Default is 1.0.
+        v_to : float, optional
+            Target take-off velocity in m/s. Used only if `vel_break=True`. Default is 74.5 m/s.
+        vel_break : bool, optional
+            If True, terminates ground roll when velocity reaches `v_to`, regardless of lift. Default is False.
+        return_velocity : bool, optional
+            If True, returns a tuple (take-off distance, lift-off velocity). Default is False.
+        dv0 : float, optional
+            Base velocity increment (m/s) for simulation time steps. Default is 0.01 m/s.
+        dv_decay : str, optional
+            Strategy for reducing dv as velocity increases. Options: 
+            'const' (constant dv), 'exp' (exponential decay), 
+            'exp+' (stronger exponential), 'inv' (inverse). Default is 'const'.
 
-     Returns:
-     --------
-     float or tuple
-         If return_velocity is False: total take-off distance in meters.
-         If return_velocity is True: (total take-off distance in meters, lift-off velocity in m/s).
+        Returns:
+        --------
+        float or tuple :s
+            If return_velocity is False: total take-off distance in meters.
+            If return_velocity is True: (total take-off distance in meters, lift-off velocity in m/s).
     '''
     ground_speed = 0.0  # m/s
     vel = ground_speed + head_wind
@@ -125,7 +146,52 @@ def take_off(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name,
 def calc_todr(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name, 
              alt_ft= 0.0, head_wind = 0.0, margin_coeff=1.15, 
              mu=0.017, theta=0., dv0 = 0.01, v_max = 200.0, complete_data = False):
-    
+    '''
+        Calculates the take-off distance required (TODR) using integration of acceleration
+        over ground speeds up to lift-off conditions.
+
+        Parameters:
+        -----------
+        m : float
+            Aircraft mass in kg.
+        rho : float
+            Air density in kg/m^3.
+        cl : float
+            Lift coefficient.
+        cd0 : float
+            Zero-lift drag coefficient.
+        k : float
+            Induced drag factor.
+        w_area : float
+            Wing surface area in m^2.
+        airborne_d : float
+            Distance after lift-off in meters.
+        aircraft_name : str
+            Aircraft model name.
+        engine_name : str
+            Engine model name.
+        alt_ft : float, optional
+            Airport altitude in feet above sea level. Default 0.0.
+        head_wind : float, optional
+            Headwind velocity in m/s. Default 0.0.
+        margin_coeff : float, optional
+            Safety margin multiplier applied to total distance. Default 1.15.
+        mu : float, optional
+            Rolling friction coefficient. Default 0.017.
+        theta : float, optional
+            Runway slope angle in degrees. Default 0°.
+        dv0 : float, optional
+            Velocity step for numerical integration. Default 0.01 m/s.
+        v_max : float, optional
+            Maximum velocity limit for calculation (m/s). Default 200 m/s.
+        complete_data : bool, optional
+            If True, returns detailed performance data dictionary, else just TODR. Default False.
+
+        Returns:
+        --------
+        float or dict:
+        Total take-off distance required in meters, or dict of detailed data if complete_data=True.
+    '''    
     theta = conv.convert(theta, 'deg', 'rad')
     cd = cd0 + k * cl* cl
     weight = m * G
@@ -174,48 +240,49 @@ def cl_finder(aircraft_name, engine_name, aircraft_mass, to_manuf_value, rho_isa
               cd_0, k_p, wing_area, airborne_dist, safe_margin_coeff,
               mu, dv0=0.01, theta=0., cl_min=1.0, cl_max=2.0, cl_step=0.01):
     '''
-    Grid search to find the optimal lift coefficient C_L that minimizes the RMSD
-    between model-based TODR (using calc_todr) and manufacturer values.
+        Performs grid search to find the optimal lift coefficient C_L that minimizes the RMSD
+        between model-calculated TODR and manufacturer-provided take-off distances.
 
-    Parameters
-    ----------
-    aircraft_name : str
-        Name of the aircraft model.
-    engine_name : str
-        Name of the engine model.
-    aircraft_mass : array-like
-        Aircraft mass values in kg.
-    to_manuf_value : array-like
-        Manufacturer take-off distances in meters.
-    rho_isa : float
-        Air density in kg/m³.
-    cd_0 : float
-        Zero-lift drag coefficient.
-    k_p : float
-        Induced drag factor.
-    wing_area : float
-        Wing area in m².
-    airborne_dist : float
-        Airborne segment in meters.
-    safe_margin_coeff : float
-        Safety margin multiplier.
-    mu : float
-        Friction coefficient.
-    dv0 : float, optional
-        Speed resolution for TODR integration.
-    theta : float, optional
-        Runway slope (degrees).
-    cl_min, cl_max : float
-        Bounds of the C_L grid.
-    cl_step : float
-        Grid step.
+        Parameters:
+        ----------
+        aircraft_name : str
+            Name of the aircraft model.
+        engine_name : str
+            Name of the engine model.
+        aircraft_mass : array-like
+            Aircraft mass values in kilograms.
+        to_manuf_value : array-like
+            Manufacturer take-off distances in meters.
+        rho_isa : float
+            Air density in kg/m^3.
+        cd_0 : float
+            Zero-lift drag coefficient.
+        k_p : float
+            Induced drag factor.
+        wing_area : float
+            Wing area in m^2.
+        airborne_dist : float
+            Distance after lift-off in meters.
+        safe_margin_coeff : float
+            Safety margin coefficient.
+        mu : float
+            Rolling friction coefficient.
+        dv0 : float, optional
+            Velocity step for integration. Default 0.01 m/s.
+        theta : float, optional
+            Runway slope angle in degrees. Default 0°.
+        cl_min, cl_max : float, optional
+            Range of C_L to test.
+        cl_step : float, optional
+            Step size for C_L grid.
 
-    Returns
-    -------
-    best_cl_guess : float
-        Best estimate for the lift coefficient.
-    dummy_error : float
-        Placeholder for uncertainty (currently 0.1).
+        Returns:
+        -------
+        best_cl_guess : float
+            Optimal lift coefficient minimizing RMSD.
+        dummy_error : float
+            Placeholder uncertainty (currently fixed at 0.1).
+    
     '''
 
     cl_candidates = np.arange(cl_min, cl_max + cl_step, cl_step)

@@ -1,3 +1,18 @@
+"""
+    Lift Coefficient calibration
+    
+    this script calibrates the lift coefficient (C_L) for a given aircraft and engine by fitting
+    modeled takeoff distances to manufacturer data. Computes takeoff distances using
+    the optimized C_L, estimates uncertainty bounds, and saves results with metadata
+    to a Parquet file for further analysis.
+
+    It depends on the OpenAP library and project-specific modules.
+
+    Author: Lorenzo Cane - DBL E&E Area Consultant
+    Last modified: 20/06/2025
+"""
+
+
 import numpy as np
 import pandas as pd
 import pyarrow as pa
@@ -5,13 +20,15 @@ import pyarrow.parquet as pq
 import os
 import sys
 from config_loader import load_config
-from performanc_functions import cl_finder, calc_todr
+from performance_functions import cl_finder, calc_todr
 from aircraft_utils import get_aircraft_data, get_thrust, get_to_speed
 from constants import *
 from openap import prop #aircraft and engine-related data
 sys.path.insert(0,'./utils')
 from unit_converter import ComplexUnitConverter as conv
 
+#***************************************************************************
+#import from configuration file config.yml & create dirs
 config = load_config()
 
 cl_path = config['Dir']['cl_dir']
@@ -31,6 +48,7 @@ airborne_dist = asc_m / np.tan(conv.convert(CLIMB_ANGLE_DEG, 'deg', 'rad')) # m
 
 rho_isa = ISA_PR / (R_SPEC * ISA_TEMP)
 
+#------------------------------------------------------------------------------
 #Load aircraft masses and TO manuf results
 manuf_file = cl_path + '/TODR_MTOM_manuf' + f"/{aircraft_name}_{engine_name}.txt"
 
@@ -46,7 +64,8 @@ else :
 if (len(aircraft_mass) != len(to_manuf_value)):
     raise ValueError (f"Dimension error: aircraft masses dim = {len(aircraft_mass)} != to manufacturer value = {len(to_manuf_value)}")
 
-#Find best C_l values for min, opt and max take-off velocities
+#***************************************************************************
+#Find best C_l given the manufacturer data
 cl_values = []
 cl_rsmd = []
 
@@ -65,6 +84,7 @@ err_cl_best = 0.01
 
 print(f"C_l finding process results: C_l = {cl_best} +- {err_cl_best}")
 
+#***************************************************************************
 # Compute model predictions using best-fit CL
 model_to_dist = np.array([calc_todr(m=i, rho=rho_isa, cl=cl_best, cd0=cd0, k=k, w_area=wing_area,
         airborne_d=airborne_dist, aircraft_name=aircraft_name, engine_name=engine_name,
@@ -171,4 +191,4 @@ parquet_path = os.path.join(cl_path, f"cl_{aircraft_name}_{engine_name}_TODR_dat
 #parquet_path = os.path.join(output_path, "cl_TODR_data_vel_break.parquet")
 
 pq.write_table(table, parquet_path)
-print(f"Data with metadata written to {parquet_path}")
+print(f"C_L DataFrame with metadata written to {parquet_path}")

@@ -1,3 +1,12 @@
+"""
+    Utility functions for environment setup and directory management.
+
+    Functions:
+    ----------
+    - install_requirements(requirements_file): Installs Python dependencies from a requirements file.
+    - dir_existance_checker(dir_path): Ensures the existence of a directory, creating it if necessary.
+"""
+
 import subprocess
 import threading
 import time
@@ -6,6 +15,25 @@ from tqdm import tqdm
 import os
 
 def install_requirements(requirements_file="requirements.txt"):
+    """
+        Install Python dependencies from a requirements file in a background thread.
+        While installing, a progress bar is shown for user feedback.
+
+        Parameters:
+        ----------
+        requirements_file : str
+            Path to the requirements file. Defaults to "requirements.txt".
+
+        Behavior:
+        ---------
+        - Runs pip install command with quiet output.
+        - Handles errors gracefully (file not found, pip errors, unexpected issues).
+        - Displays a simple progress bar using tqdm during installation.
+
+        Returns:
+        --------
+        None
+    """
     print(f'Installing requirements (see {requirements_file})')
     def pip_install():
         try:
@@ -43,9 +71,3 @@ def install_requirements(requirements_file="requirements.txt"):
         print(f"Requirements file '{requirements_file}' not found.")
     else:
         print(f"{status[0]}")
-
-
-
-def dir_existance_checker(dir_path):
-    os.makedirs(dir_path, exist_ok=True)
-    print(f'Dir {dir_path} checked')

@@ -1,5 +1,20 @@
+"""
+    plots.py
 
+    This module loads take-off distance required (TODR) data from a grid simulation 
+    and generates a heatmap of TODR values across two varying atmospheric parameters.
 
+    It uses a precomputed TODR `.parquet` file containing results of TODR calculations
+
+    The script enforces that two parameters are fixed (e.g., Temperature and Pressure) 
+    and the other two are varied to produce a 2D heatmap.
+
+    Dependencies project-specific utilities: unit_converter, file_utils, constants
+
+    Author: Lorenzo Cane - DBL E&E Area Consultant
+    Last modified: 20/06/2025
+"""
+#***************************************************************************
 #Import libraries and dependencies
 import sys
 sys.path.insert(0, './utils')
@@ -21,9 +36,6 @@ warnings.filterwarnings('ignore') #to exclude sns warning
 
 
 #***************************************************************************
-#Phases
-CL_FINDER = False
-
 #Fixed values dict (use if ph quantinty is fixed)
 fixed_values = {
     "Temperature" : ISA_TEMP,
@@ -39,9 +51,6 @@ plt.rcParams['figure.dpi'] = 110
 plt.rcParams['savefig.dpi'] = 110
 plt.style.use('custom_style.mplstyle')
 cyclec = (plt.rcParams['axes.prop_cycle'].by_key()['color'])
-
-
-
 cyclec = (plt.rcParams['axes.prop_cycle'].by_key()['color'])
 #***************************************************************************
 #import from configuration file config.yml & create dirs
@@ -91,23 +100,21 @@ if not all(key in allowed_keys for key in fixed_params):
 if not len(fixed_params) == 2:
     raise ValueError(f'fixed_params len must be 2, {len(fixed_params)} found.')
 
-#Selection of the parquet file
+#***************************************************************************
+#Laod TODR results
 otuput_file = f"todr_grid_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.parquet"
 df = pd.read_parquet(os.path.join(output_dir, otuput_file))
 
-#----------------------------------------------------------------------------------------------------------------------
-#Plots pivot table
-
+#***************************************************************************
 #Pivot table
 heatmap_data = df.pivot(index= varying_params[1], columns= varying_params[0], values='TODR')
 
-'''
-!!!
-REMINDER: main style configuration are in custom_style.mplstyle file
-!!!
-'''
 
+# ----------------------------------------------------------
+# Helper function to create axis labels
 def create_labels(quantity_name):
+    """Returns a label with unit for the given physical quantity."""
+
     unit_dict = {
         "Temperature" : " [˚C]",
         "Pressure" : " [Pa]",
@@ -120,13 +127,23 @@ def create_labels(quantity_name):
     return label
 
 
-
+# ----------------------------------------------------------
+# Plotting the heatmap
 plt.figure(figsize=(10, 8))
 sns.heatmap(heatmap_data, annot=False, cmap='summer')
 plt.title("TODR table")
 plt.xlabel(create_labels(varying_params[0]))
 plt.ylabel(create_labels(varying_params[1]))
 plt.tight_layout()
+
+# Save to PDF
 plt.savefig(os.path.join(img_dir,f"todr_grid_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.pdf"))
 plt.show()
 plt.close()
+
+
+'''
+!!!
+REMINDER: main style configuration are in custom_style.mplstyle file
+!!!
+'''

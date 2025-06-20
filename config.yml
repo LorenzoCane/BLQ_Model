@@ -1,4 +1,18 @@
-#Configuration file
+# Configuration file for aircraft takeoff performance simulation
+#
+# Sections:
+# - Dir: Directory paths for data, inputs, results, images, and outputs.
+# - Grid: Parameter ranges and steps for environmental conditions (temperature, pressure, humidity, wind).
+# - Aircraft: Aircraft and engine identifiers.
+# - Airport: Airport code for location-specific data.
+# - Climate: Climate model and months selection for environmental data.
+# - Mass: Passenger mass specification used for weight calculations.
+#
+# Example values are provided for a typical setup with an A320 aircraft,
+# ACCESS-ESM1-5 climate model, and LIPE airport.
+
+#Author: Lorenzo Cane - DBL E&E Area Consultant
+#Last modified: 20/06/2025
 
 #Dir and path
 Dir:
@@ -8,12 +22,13 @@ Dir:
   img_dir: './results/img'
   output_dir: './results/output'
 
+#Grid
 Grid:
   temp_min: -15 #˚C
-  temp_max: 41.0 #˚C
+  temp_max: 40.0 #˚C
   temp_step: 1.0 #˚C
   pres_min: 80000 #Pa
-  pres_max: 101900 #Pa
+  pres_max: 102000 #Pa
   pres_step: 250 #Pa
   hum_min: 0.0 #%
   hum_max: 100 #%

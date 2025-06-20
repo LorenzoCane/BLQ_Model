@@ -1,9 +1,23 @@
-'''
-DEEP BLUE SRL.
-Lorenzo Cane - Energy & Environment Area Consultant
+"""
+    Main script for aircraft performance evaluation at a specific airport (BLQ).
 
-Last Modified : 12/06/2025
-'''
+    This script evaluates the Take-Off Distance Required (TODR) over a grid of atmospheric
+    parameters (temperature, pressure, humidity, headwind) using a parallelized computation.
+    Results are saved in a Parquet file for post-processing.
+
+    Workflow:
+    ---------
+    1. Load configuration from YAML file.
+    2. Import and check aircraft and airport parameters.
+    3. Load (or compute) optimal lift coefficient (C_L).
+    4. Create a grid of parameter combinations (2 varying, 2 fixed).
+    5. Evaluate TODR and air density over the grid using multiprocessing.
+    6. Save the output as a Parquet file. (opt plots)
+
+    Author: Lorenzo Cane - DBL E&E Area Consultant
+    Last Modified: 20/06/2025
+"""
+
 
 #Import libraries and dependencies
 import matplotlib.pyplot as plt
@@ -16,6 +30,8 @@ print('-------------------------------------------------------------------------
 from constants import *
 
 import numpy as np
+import matplotlib.pyplot as plt
+import sys
 import os
 import yaml
 from tqdm import tqdm
@@ -26,16 +42,19 @@ import subprocess
 from multiprocessing import Pool, cpu_count
 from itertools import product
 
-from performanc_functions import take_off, calc_todr
+from performance_functions import take_off, calc_todr
 from airport_utils import *
 from aircraft_utils import *
 from atm_functions import compute_air_density
 
 #***************************************************************************
 #Phases
-CL_FINDER = False
+CL_FINDER = False #C_L finder sub process can be impose
+PLOTS = False     #Make plot or not in main (plot subprecess)
 
-#Fixed values dict (use if ph quantinty is fixed)
+#***************************************************************************
+#Fixed values dict (used if the parameter is fixed)
+#Fixed parameters are selected in config file, fixed value are taken from constant.py file
 fixed_values = {
     "Temperature" : ISA_TEMP,
     "Headwind" : FIX_HW,
@@ -50,17 +69,12 @@ plt.rcParams['figure.dpi'] = 110
 plt.rcParams['savefig.dpi'] = 110
 plt.style.use('custom_style.mplstyle')
 cyclec = (plt.rcParams['axes.prop_cycle'].by_key()['color'])
-
-
-
 cyclec = (plt.rcParams['axes.prop_cycle'].by_key()['color'])
 #***************************************************************************
 #import from configuration file config.yml & create dirs
 config_file = 'config.yml'
-
 with open(config_file, 'r') as file:
     config = yaml.safe_load(file)
-
 
 # Accessing different sections
 cl_path = config['Dir']['cl_dir']
@@ -80,11 +94,18 @@ passenger_mass = config['Mass']['passenger_mass']
 
 # Grid parameters
 grid = config['Grid']
+
+#Validation of ranges
+assert grid['temp_min'] < grid['temp_max'], "Temperature range invalid!"
+assert grid['pres_min'] < grid['pres_max'], "Pressure range invalid!"
+assert grid['hum_min'] < grid['hum_max'], "Relative humidity range invalid!"
+assert grid['wind_min'] < grid['wind_max'], "Headwind range invalid!"
+
 temp_arr = np.arange(grid['temp_min'], grid['temp_max'] + 0.1, grid['temp_step'])
 pres_arr = np.arange(grid['pres_min'], grid['pres_max'] + 1, grid['pres_step'])
 hum_arr  = np.arange(grid['hum_min'],  grid['hum_max'] + 0.1, grid['hum_step'])
 wind_arr = np.arange(grid['wind_min'], grid['wind_max'] + 0.1, grid['wind_step'])
-#Dict of all the arrays
+#Dict of all parameters arrays
 param_arrays = {"Temperature": temp_arr,
                 "Pressure": pres_arr,
                 "Humidity": hum_arr,
@@ -94,7 +115,7 @@ param_arrays = {"Temperature": temp_arr,
 fixed_params = grid['fixed_params']
 varying_params = [key for key in allowed_keys if key not in fixed_params]
 
-#Check that all params are allowed keys
+#Check that all params are allowed
 if not all(key in allowed_keys for key in fixed_params):
     invalid_keys = [key for key in fixed_params if key not in allowed_keys]
     raise NameError(f"Invalid keys found in fixed_params: {invalid_keys}")
@@ -112,7 +133,6 @@ airborne_dist = asc_m / np.tan(conv.convert(CLIMB_ANGLE_DEG, 'deg', 'rad')) # m
 
 #import airport and aircraft data
 aircraft_info = get_aircraft_data(aircraft_name, engine_name)
-
 wing_area = aircraft_info["wing_area"]
 cd0 = aircraft_info["cd0"]
 k = aircraft_info["k"]
@@ -124,12 +144,12 @@ airport_elev =  airport_get_elev(airport_code)
 
 print(f'Configuration successfully loaded from {config_file}')
 
-#dirs
+#Ensure dirs existance
 os.makedirs(results_dir, exist_ok=True)
 os.makedirs(img_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 #***************************************************************************
-# #Perform C_L evaluation if needed or request
+#1) C_L evaluation if needed or request
 cl_parquet_path = os.path.join(cl_path, f"cl_{aircraft_name}_{engine_name}_TODR_data.parquet")
 
 if any([CL_FINDER, not os.path.exists(cl_parquet_path)]):
@@ -154,9 +174,9 @@ else:
 
 
 #***************************************************************************
-# GRID CALCULATION
+#2) PARAMETER GRID CALCULATION
 
-#Create grid with the varying params
+#Create grid with the varying params (avoiding nested for loops)
 param_grid = list(product(param_arrays[varying_params[0]], param_arrays[varying_params[1]]))
 len_grid = len(param_grid)
 
@@ -164,13 +184,27 @@ selected_fix_val = {key: fixed_values[key] for key in fixed_params }
 
 print(sep)
 print("Parameters grid successfully created.")
+print('================================================================')
 print(f'Varying params: {varying_params[0]} and {varying_params[1]}')
 print(f'Fixed params: {selected_fix_val}')
 print(f'Dimension of the grid : {len_grid}')
+print('================================================================')
 
 
-#Define worker function
+#Define worker function for parallel computation
 def worker(params):
+    '''
+        Compute air density and aircraft performance give a combination of two varying parameters,
+
+        Parameters:
+        ----------
+        params : list, float
+                Value of the varying parameters
+        
+        Return:
+        ---------
+        dict : Dictionary of input parameters, air density, and computed TODR.
+    '''
     p1_val, p2_val = params
     param_dict = {
         varying_params[0]: p1_val,
@@ -178,7 +212,7 @@ def worker(params):
         **selected_fix_val
     }
 
-    # Compute air density
+    # Compute air density (Buch  moist air equation)
     rho = compute_air_density(
         temp_c=param_dict["Temperature"],
         press_pa=param_dict["Pressure"],
@@ -203,10 +237,11 @@ def worker(params):
         "TODR": todr
     }
 
-#Parallel execution
-
+#***************************************************************************
+#3) Parallel execution
 
 if __name__ == '__main__':
+    # Use multiprocessing to evaluate performance grid in parallel
     with Pool(cpu_count()) as pool:
         results = list(tqdm(pool.imap_unordered(worker, param_grid),
                             total=len(param_grid),
@@ -215,9 +250,15 @@ if __name__ == '__main__':
                             )
                         )
 
+    #collect all the partial results in a DateFrame and save it as a parquet file
     df = pd.DataFrame(results)
     output_name = f"todr_grid_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.parquet"
     output_path = os.path.join(output_dir, output_name)
-    df.to_parquet(output_path, index=False)
+    df.to_parquet(output_path, index=False) #no index
+    
+    #Print dataFrame lines for quick check
+    print(sep)
+    print(f'Computation ends. Performance results saved in {output_path}')
+    print('Quick check:')
     print(df.head())
 

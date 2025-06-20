@@ -8,7 +8,7 @@ import matplotlib.pylab as plt
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
 sys.path.append(parent)
-from performanc_functions import calc_todr, take_off
+from performance_functions import calc_todr, take_off
 from airport_utils import *
 from aircraft_utils import *
 from atm_functions import compute_air_density

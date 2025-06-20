@@ -1,3 +1,23 @@
+"""
+    Aircraft Performance Utilities
+
+    This module provides utility functions to support aircraft performance modeling,
+    including data extraction for aircraft and engine properties, take-off speed
+    calculations, thrust computations, and manufacturer take-off distance data loading.
+
+    It depends on OpenAP's `prop`, `kinematic`, and `thrust` modules for aircraft
+    modeling and a custom `unit_converter` for unit handling.
+
+    Functions:
+    - get_aircraft_data:    Extract key aircraft parameters.
+    - get_to_speed:         Calculate take-off speed range.
+    - get_thrust:           Estimate thrust at different speeds and altitudes.
+    - manuf_data_loader:    Load manufacturer-provided TODR vs. mass data.
+
+    Author: Lorenzo Cane - DBL E&E Area Consultant
+    Last modified: 20/06/2025
+"""
+
 import numpy as np
 import os
 import sys
@@ -5,12 +25,24 @@ import sys
 from openap import prop #aircraft and engine-related data
 from openap.kinematic import WRAP #set of kinematic models
 from openap.thrust import Thrust #thrust calc
-from openap.drag import Drag
 sys.path.insert(0, './utils')
 from unit_converter import ComplexUnitConverter as conv
 
 def get_aircraft_data(aircraft_name, engine_name):
-    #aircraft specif.
+    '''
+        Automatic aircraft data wrapper
+
+        Parameters:
+        ----------
+        aircraft_name : str
+                    Aircraft name
+        engine_name : str
+                    Engine used by the aircraft
+        
+        Return:
+        ----------
+        dict: Dict with all useful data (wing area, friction coefficient,etc)
+    '''
     aircraft = prop.aircraft(aircraft_name) #airbus A320
     engine = prop.engine(engine_name) #V2500-A1 turbofan engines
     wing_area = aircraft['wing']['area'] #wing area
@@ -30,7 +62,7 @@ def get_aircraft_data(aircraft_name, engine_name):
     return useful_dict
 
 def get_to_speed(aircraft_name):
-    #aircraft TO speeds
+
     wrap = WRAP(ac=aircraft_name) #kinematic parameters
     to_speed = wrap.takeoff_speed() # m/s Take-off speed. order: default (optimum), minimum, maximum
     '''
@@ -44,7 +76,24 @@ def get_to_speed(aircraft_name):
 
 #***************************************************************************
 def get_thrust(aircraft_name, engine_name, speeds_ms, alt_ft):
-    #to_speed = get_to_speed(aircraft_name)
+    '''
+        Calculate thrust (in N) of a given aircraft - engiine combination at gives TAS velocity and altitude
+        
+        Parameters:
+        ----------
+        aircraft_name : str
+                    Aircraft name
+        engine_name : str
+                    Engine used by the aircraft
+        speed_ms : float, list
+                takeoff velocity in m/s
+        alt_ft : float 
+                airport altitude in ft
+        Return:
+        ----------
+        float : thrust value, in N
+
+    '''
 
     thr = Thrust(ac= aircraft_name, eng= engine_name)
     T = np.array([thr.takeoff(tas = conv.convert(sp, 'ms', 'kts'), alt=alt_ft) for sp in speeds_ms]) #N conv
@@ -53,6 +102,24 @@ def get_thrust(aircraft_name, engine_name, speeds_ms, alt_ft):
 
 #***************************************************************************
 def manuf_data_loader(cl_path, aircraft_name, engine_name):
+    '''
+        Load manufacturer TODR vs. aircraft mass data 
+        
+        Parameters:
+        ----------
+        cl_path: str
+                Path to the manufacturer data (as a .txt file)
+        aircraft_name : str
+                    Aircraft name
+        engine_name : str
+                    Engine used by the aircraft
+        
+        Return:
+        ----------
+        float : aicraft mass (in kg)
+        float : Take-off distance with given mass (in m)
+        float : TODR error
+    '''
     manuf_file = cl_path + '/TODR_MTOM_manuf' + f"/{aircraft_name}_{engine_name}.txt"
 
     if os.path.exists(manuf_file):
