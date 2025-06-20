@@ -6,8 +6,7 @@ Last Modified : 12/06/2025
 '''
 
 #Import libraries and dependencies
-
-
+import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, './utils')
 from unit_converter import ComplexUnitConverter as conv
@@ -44,6 +43,17 @@ fixed_values = {
     "Pressure" : ISA_PR
 }
 allowed_keys =  fixed_values.keys()
+
+#***************************************************************************
+# Plotting, general appereance
+plt.rcParams['figure.dpi'] = 110
+plt.rcParams['savefig.dpi'] = 110
+plt.style.use('custom_style.mplstyle')
+cyclec = (plt.rcParams['axes.prop_cycle'].by_key()['color'])
+
+
+
+cyclec = (plt.rcParams['axes.prop_cycle'].by_key()['color'])
 #***************************************************************************
 #import from configuration file config.yml & create dirs
 config_file = 'config.yml'
@@ -175,11 +185,16 @@ def worker(params):
         rh_perc=param_dict["Humidity"]
     )
 
-    # Compute TODR
-    todr = calc_todr(m=mass_max, rho=rho, cl=cl_best, cd0=cd0, k=k, w_area=wing_area,
+    try:
+        # Compute TODR
+        todr = calc_todr(m=mass_max, rho=rho, cl=cl_best, cd0=cd0, k=k, w_area=wing_area,
                      airborne_d=airborne_dist, aircraft_name=aircraft_name, engine_name=engine_name,
                      alt_ft=airport_elev, head_wind=param_dict["Headwind"])
-
+    
+    except Exception as e:
+        print(f"[Warning] Failed at {param_dict} → {e}")
+        todr = float("nan")  # or np.nan
+    
     return {
         varying_params[0]: p1_val,
         varying_params[1]: p2_val,
@@ -205,3 +220,4 @@ if __name__ == '__main__':
     output_path = os.path.join(output_dir, output_name)
     df.to_parquet(output_path, index=False)
     print(df.head())
+

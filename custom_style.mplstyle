@@ -1,0 +1,68 @@
+#This is a custom matplotlib file for plotting in the BLQ consulence. 
+#Created: Lorenzo Cane on June 19th, 2025
+# To check more avaialble options see:
+# https://matplotlib.org/tutorials/introductory/customizing.html
+
+text.color : (0.2,0.2,0.2)
+
+
+# AXES
+axes.titlesize : 15
+axes.labelsize : 15 #for better readability (smaller values if longer labels must be used)
+axes.edgecolor : (0.1,0.1,0.1) #Normalized RGB colours (from 0 to 1 instead of 0 to 255)
+axes.labelcolor : (0.1,0.1,0.1)
+axes.linewidth : 1
+axes.spines.top : True
+axes.spines.right : True
+axes.spines.bottom : True
+axes.spines.left : True
+
+axes.grid.axis:     both
+
+# GRID
+axes.grid : True
+grid.color: gray
+grid.alpha : 0.2
+grid.linestyle : :
+grid.linewidth : 0.5
+
+# LINES
+axes.prop_cycle : cycler('color', ['648fff','785ef0','dc267f','fe6100','ffb000','000000','ffffff']) #hex colours, IBM colorblind palette
+#axes.prop_cycle : cycler('color', ['0072b2','009e73','d55e00','cc79a7','f0e442','56b4e9']) #hex colours, seaborn colorblind palette
+lines.linewidth : 1.5
+lines.markeredgewidth : 0.0
+
+# SCATTER PLOT
+scatter.marker : .
+
+# TICKS
+xtick.labelsize : 15
+xtick.color : (0.2,0.2,0.2)
+xtick.direction : in
+ytick.labelsize : 15
+ytick.color : (0.2,0.2,0.2)
+ytick.direction : in
+xtick.top:     True
+ytick.right: True
+
+## ***************************************************************************
+## * LEGEND                                                                  *
+## ***************************************************************************
+
+legend.frameon:       False     # if True, draw the legend on a background patc
+
+#TEXT
+
+font.size: 15
+legend.fontsize: 15
+
+
+
+# FIGURE OUTPUT 
+#figure.figsize  : 6, 5
+savefig.dpi: 300
+savefig.bbox: tight
+
+
+# Added for heatmap visualization
+image.cmap: summer

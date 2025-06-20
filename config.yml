@@ -10,8 +10,8 @@ Dir:
 
 Grid:
   temp_min: -15 #˚C
-  temp_max: 40.0 #˚C
-  temp_step: 5.0 #˚C
+  temp_max: 41.0 #˚C
+  temp_step: 1.0 #˚C
   pres_min: 80000 #Pa
   pres_max: 101900 #Pa
   pres_step: 250 #Pa
@@ -19,7 +19,7 @@ Grid:
   hum_max: 100 #%
   hum_step: 10.0 #%
   wind_min: 0.0 #m/s
-  wind_max: 13.0 #m/s
+  wind_max: 25.0 #m/s
   wind_step: 1.0 #m/s
   fixed_params: [ "Humidity", "Pressure" ] #allowed keywords : "Temperature" ,"Headwind", "Humidity", "Pressure"
 
