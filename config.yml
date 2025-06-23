@@ -16,7 +16,7 @@
 
 #Dir and path
 Dir:
-  cl_dir: './cl_data/'
+  cl_dir: './input/cl_data'
   input_dir: './input/'
   results_dir: './results/'
   img_dir: './results/img'
