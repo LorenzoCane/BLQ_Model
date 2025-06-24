@@ -78,7 +78,7 @@ Athmospheric variables considered are **Temperature, pressure, headwind and air 
 ## Usage
 1) Edit the [config.yml]('./config.yml') file to specify:
 
-    - <span style="color:red">*the two fixed variables*</span> between  temperature, pressure, humidity, and headwind (i.e.: the performance grid will be creatd on the other two variables).
+    - **the two fixed variables** between  temperature, pressure, humidity, and headwind (i.e.: the performance grid will be creatd on the other two variables).
     - Aircraft type;
     - Engine configuration;
     - Airport configuration;
