@@ -76,7 +76,7 @@ Athmospheric variables considered are **Temperature, pressure, headwind and air 
     > :warning: **PLEASE BE AWARE OF THE NAMING CONVENTIONS USED**.
 
 ## Usage
-1) Edit the [config.yml]('./config.yml') file to specify:
+1) Edit the [config.yml]('config.yml') file to specify:
 
     - **the two fixed variables** between  temperature, pressure, humidity, and headwind (i.e.: the performance grid will be creatd on the other two variables).
     - Aircraft type;
