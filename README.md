@@ -20,11 +20,11 @@ Athmospheric variables considered are **Temperature, pressure, headwind and air 
 
 - Modular design with reusable utilities for:
 
-    - Aircraft performance,
+    * Aircraft performance,
 
-    -   Atmospheric modeling,
+    *   Atmospheric modeling,
 
-    - Airport elevation and location;
+    * Airport elevation and location;
 
 - Styled plots with a custom matplotlib style.
 
@@ -67,30 +67,31 @@ Athmospheric variables considered are **Temperature, pressure, headwind and air 
 
 
 ## Getting Started
-1) Ensure you have **Python 3.8 or higher** installed. Alternatively, you can request a **Google Colab notebook version** if preferred;
+1) Ensure you have **Python 3.8 or higher** installed. Alternatively, you can request a *Google Colab notebook version* if preferred;
 
-2) To run the project locally, place the required data files in the following directories:
+2) To run the project locally, **place the required data files in the following directories**:
     - Airports runways input data $→$ `./input/`; 
     - Manufacturer take-off performance data (txt file) $→$ `./input/cl_data/TODR_MTOM_manuf/`. 
     
     > :warning: **PLEASE BE AWARE OF THE NAMING CONVENTIONS USED**.
 
 ## Usage
-1) Edit the config.yml file to specify:
+1) Edit the [config.yml]('./config.yml') file to specify:
 
+    - <span style="color:red">*the two fixed variables*</span> between  temperature, pressure, humidity, and headwind (i.e.: the performance grid will be creatd on the other two variables).
     - Aircraft type;
     - Engine configuration;
     - Airport configuration;
     - Ranges for temperature, pressure, humidity, and headwind.
 
-2) To ensure all necessary `.parquet` files and directories are created, it is recommended to run the entire pipeline on first execution:
+2) To ensure all necessary `.parquet` files and directories are created, **it is recommended to run the entire pipeline on first execution**:
     ```
     python main.py
     ```
     This will:
-    1. Install all the requested libraries;
+    1. Install all the requested libraries (if needed);
     2. Load the configuration;
-    3. Fit the lift coefficient for the selected aircraft-engine configuration;
+    3. Fit the lift coefficient for the selected aircraft-engine configuration (if needed or asked);
     4. Simulate TODR and air density over the defined grid;
     5. Save the output and plots in a predefined dirs and format.
 
