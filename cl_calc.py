@@ -46,7 +46,7 @@ mass_max = aircraft_info["mass_max"]
 asc_m = conv.convert(ASC, 'ft', 'm') # m
 airborne_dist = asc_m / np.tan(conv.convert(CLIMB_ANGLE_DEG, 'deg', 'rad')) # m
 
-rho_isa = ISA_PR / (R_SPEC * ISA_TEMP)
+rho_isa = ISA_PR / (R_SPEC * conv.convert(ISA_TEMP, 'celsius', 'kelvin'))
 
 #------------------------------------------------------------------------------
 #Load aircraft masses and TO manuf results
