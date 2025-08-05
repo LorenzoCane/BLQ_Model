@@ -69,6 +69,7 @@ output_dir =  config['Dir']['output_dir']
 
 aircraft_name = config['Aircraft']['aircr_name']
 engine_name = config['Aircraft']['aircr_engine']
+thr_lim = config['Aircraft']['thr_lim']
 
 airport_code = config['Airport']['airport_code']
 
@@ -101,45 +102,50 @@ if not len(fixed_params) == 2:
     raise ValueError(f'fixed_params len must be 2, {len(fixed_params)} found.')
 
 #***************************************************************************
-#Laod TODR results
+#Load TODR results
 otuput_file = f"todr_grid_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.parquet"
 df = pd.read_parquet(os.path.join(output_dir, otuput_file))
 
 #***************************************************************************
-#Pivot table
-heatmap_data = df.pivot(index= varying_params[1], columns= varying_params[0], values='TODR')
-
+plots_quant = ['TODR', 'MTOM']
 
 # ----------------------------------------------------------
-# Helper function to create axis labels
+# Helper functions to create axis and cbar labels
 def create_labels(quantity_name):
     """Returns a label with unit for the given physical quantity."""
 
     unit_dict = {
         "Temperature" : " [˚C]",
-        "Pressure" : " [Pa]",
-        "Headwind" : " [m/s]",
-        "Humidity" : " [%]"
+        "Pressure"    : " [Pa]",
+        "Headwind"    : " [m/s]",
+        "Humidity"    : " [%]",
+        "TODR  "      : " [m] ",
+        "MTOM"        : " [kg] ",
+        "ROC"         : " [m/s]     "
     }
 
     label = quantity_name + unit_dict[quantity_name]
 
     return label
 
-
 # ----------------------------------------------------------
-# Plotting the heatmap
-plt.figure(figsize=(10, 8))
-sns.heatmap(heatmap_data, annot=False, cmap='summer')
-plt.title("TODR table")
-plt.xlabel(create_labels(varying_params[0]))
-plt.ylabel(create_labels(varying_params[1]))
-plt.tight_layout()
+# Plotting the heatmaps
+for quantity in plots_quant:
+    #Pivot table
+    heatmap_data = df.pivot(index= varying_params[1], columns= varying_params[0], values=quantity)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(heatmap_data, annot=True, annot_kws={"size": 10, "color": 'black'}, fmt=".0f", 
+               cmap="summer",cbar_kws={'label': create_labels(quantity)}
+               )
+    #plt.title("TODR table")
+    plt.xlabel(create_labels(varying_params[0]))
+    plt.ylabel(create_labels(varying_params[1]))
+    plt.tight_layout()
 
-# Save to PDF
-plt.savefig(os.path.join(img_dir,f"todr_grid_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.pdf"))
-plt.show()
-plt.close()
+    # Save to PDF
+    plt.savefig(os.path.join(img_dir,f"{quantity}_grid_thr{thr_lim}_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.pdf"))
+    plt.show()
+    plt.close()
 
 
 '''

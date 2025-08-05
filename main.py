@@ -84,6 +84,7 @@ output_dir =  config['Dir']['output_dir']
 
 aircraft_name = config['Aircraft']['aircr_name']
 engine_name = config['Aircraft']['aircr_engine']
+thr_lim = config['Aircraft']['thr_lim']
 
 airport_code = config['Airport']['airport_code']
 
@@ -223,18 +224,23 @@ def worker(params):
         # Compute TODR
         todr = calc_todr(m=mass_max, rho=rho, cl=cl_best, cd0=cd0, k=k, w_area=wing_area,
                      airborne_d=airborne_dist, aircraft_name=aircraft_name, engine_name=engine_name,
-                     alt_ft=airport_elev, head_wind=param_dict["Headwind"])
-    
+                     alt_ft=airport_elev, head_wind=param_dict["Headwind"], thr_lim=thr_lim)
+        mtom = mtom(runaway_lenght=airport_l_m, initial_mass=mass_max, alt_ft=airport_elev,
+                    aircraft_name=aircraft_name, engine_name=engine_name, rho=rho, cl=cl_best, cd0=cd0,
+                    k=k, w_area=wing_area, airborne_dist=airborne_dist, safety_coef=MARGIN_COEFF,
+                    head_wind=param_dict["Headwind"], thr_lim=thr_lim )
     except Exception as e:
         print(f"[Warning] Failed at {param_dict} → {e}")
         todr = float("nan")  # or np.nan
+        mtom = float("nan")
     
     return {
         varying_params[0]: p1_val,
         varying_params[1]: p2_val,
         **selected_fix_val,
         "AirDensity": rho,
-        "TODR": todr
+        "TODR": todr,
+        "MTOM": mtom
     }
 
 #***************************************************************************

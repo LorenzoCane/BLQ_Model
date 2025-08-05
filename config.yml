@@ -42,6 +42,7 @@ Grid:
 Aircraft:
   aircr_name: 'A320'
   aircr_engine: 'V2500-A1'
+  thr_lim: 1.0
 
 #Airport specifications (try to autom via airportsdata)
 Airport:

@@ -145,7 +145,7 @@ def take_off(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name,
 
 def calc_todr(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name, 
              alt_ft= 0.0, head_wind = 0.0, margin_coeff=1.15, 
-             mu=0.017, theta=0., dv0 = 0.01, v_max = 200.0, complete_data = False):
+             mu=0.017, theta=0., dv0 = 0.01, v_max = 200.0, complete_data = False, thr_lim = 1.0):
     '''
         Calculates the take-off distance required (TODR) using integration of acceleration
         over ground speeds up to lift-off conditions.
@@ -186,6 +186,8 @@ def calc_todr(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name
             Maximum velocity limit for calculation (m/s). Default 200 m/s.
         complete_data : bool, optional
             If True, returns detailed performance data dictionary, else just TODR. Default False.
+        thr_lim : float, opt
+            Fraction of thrust used. Default 1.0
 
         Returns:
         --------
@@ -204,7 +206,7 @@ def calc_todr(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name
     data_dict = {}
 
     #Populate dict with thrust, drag , weight , acceleration values
-    data_dict["thr"] = get_thrust(aircraft_name=aircraft_name, engine_name=engine_name, speeds_ms=tas_ms, alt_ft=alt_ft)
+    data_dict["thr"] = get_thrust(aircraft_name=aircraft_name, engine_name=engine_name, speeds_ms=tas_ms, alt_ft=alt_ft) * thr_lim
     data_dict["D"] = 0.5 * rho * tas_ms**2 * w_area * cd
     data_dict["L"] = 0.5 * rho * tas_ms**2 * w_area * cl
     data_dict["W"] = weight
@@ -309,7 +311,8 @@ def cl_finder(aircraft_name, engine_name, aircraft_mass, to_manuf_value, rho_isa
                     theta=theta,
                     dv0=dv0,
                     v_max=200.0,
-                    complete_data=False
+                    complete_data=False,
+                    thr_lim= 1.0
                 )
                 todr_list.append(todr)
             except Exception as e:
@@ -332,7 +335,8 @@ def cl_finder(aircraft_name, engine_name, aircraft_mass, to_manuf_value, rho_isa
 
 
 
-def mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, cl, cd0, k, wing_area, airborne_dist, safety_coef, mu, path_angle):
+def mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, cl, cd0, k, wing_area, airborne_dist, safety_coef, mu,
+         path_angle, head_wind, thr_lim):
     '''
      Estimates the Maximum Take-Off Mass (MTOM) such that the total take-off
      distance required (TODR) does not exceed the given runway length.
@@ -376,15 +380,14 @@ def mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, c
 
     mass = initial_mass
     iter = 0
-    if take_off(mass, rho, cl, cd0, k, wing_area, airborne_dist,aircraft_name, engine_name, alt_ft=alt_ft,
-                 margin_coeff=safety_coef, mu=mu, 
-                theta=path_angle, return_velocity=False) < runway_length:
+    if calc_todr(mass, rho, cl, cd0, k, wing_area, airborne_dist, aircraft_name, engine_name, alt_ft=alt_ft,
+                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim ) < runway_length:
         return mass  # already feasible
 
     for step in [1e3, 1e2, 1e1, 1]:  # reduce mass by 1000, 100, 10, 1
         while True:
-            todr = take_off(mass, rho, cl, cd0, k, wing_area, airborne_dist,aircraft_name, engine_name, alt_ft=alt_ft,
-                 margin_coeff=safety_coef, mu=mu, theta=path_angle, return_velocity=False) 
+            todr = calc_todr(mass, rho, cl, cd0, k, wing_area, airborne_dist, aircraft_name, engine_name, alt_ft=alt_ft,
+                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim ) 
             if todr < runway_length:
                 mass += step  # step back up to refine
                 break
@@ -396,8 +399,8 @@ def mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, c
 
 
 def mtom_binary(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, cl, cd0, k,
-                wing_area, airborne_dist, safety_coef, mu, path_angle,
-                min_mass=61000, tol=1.0, iter_max=1.0e3, verbose=False):
+                wing_area, airborne_dist, safety_coef, mu, path_angle, head_wind, thr_lim,
+                min_mass=60000, tol=1.0, iter_max=1.0e3, verbose=False):
     '''
      Uses binary search to estimate the Maximum Take-Off Mass (MTOM)
      such that TODR ≤ runway_length.
@@ -449,8 +452,8 @@ def mtom_binary(runway_length, initial_mass, alt_ft, aircraft_name, engine_name,
 
     while (high - low > tol) and iteration < iter_max:
         mid = (low + high) / 2
-        todr = take_off(mid, rho, cl, cd0, k, wing_area, airborne_dist,aircraft_name, engine_name, alt_ft=alt_ft,
-                 margin_coeff=safety_coef, mu=mu, theta=path_angle, return_velocity=False) 
+        todr = calc_todr(mid, rho, cl, cd0, k, wing_area, airborne_dist, aircraft_name, engine_name, alt_ft=alt_ft,
+                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim ) 
 
         if verbose:
             print(f"[Iter {iteration}] Mass: {mid:.2f} kg, TODR: {todr:.2f} m")
