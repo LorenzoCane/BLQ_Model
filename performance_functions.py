@@ -235,6 +235,8 @@ def calc_todr(m, rho, cl, cd0, k, w_area, airborne_d, aircraft_name, engine_name
     #TODR as ground segment + airborne distance * security margin coefficient
     data_dict['TODR'] = ( data_dict['x'] + airborne_d ) * margin_coeff
 
+    data_dict['final_tas'] = data_dict['Vtas'][data_dict['index']]
+
     return data_dict if complete_data else data_dict['TODR']
 
 
@@ -335,8 +337,8 @@ def cl_finder(aircraft_name, engine_name, aircraft_mass, to_manuf_value, rho_isa
 
 
 
-def mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, cl, cd0, k, wing_area, airborne_dist, safety_coef, mu,
-         path_angle, head_wind, thr_lim):
+def calc_mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, cl, cd0, k,
+               wing_area, airborne_dist, safety_coef, head_wind, thr_lim, mu=0.017, path_angle=0.0):
     '''
      Estimates the Maximum Take-Off Mass (MTOM) such that the total take-off
      distance required (TODR) does not exceed the given runway length.
@@ -381,13 +383,13 @@ def mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, c
     mass = initial_mass
     iter = 0
     if calc_todr(mass, rho, cl, cd0, k, wing_area, airborne_dist, aircraft_name, engine_name, alt_ft=alt_ft,
-                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim ) < runway_length:
+                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim , mu=mu, theta=path_angle)  < runway_length:
         return mass  # already feasible
 
     for step in [1e3, 1e2, 1e1, 1]:  # reduce mass by 1000, 100, 10, 1
         while True:
             todr = calc_todr(mass, rho, cl, cd0, k, wing_area, airborne_dist, aircraft_name, engine_name, alt_ft=alt_ft,
-                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim ) 
+                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim , mu=mu, theta=path_angle) 
             if todr < runway_length:
                 mass += step  # step back up to refine
                 break
@@ -398,8 +400,8 @@ def mtom(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, c
     return mass
 
 
-def mtom_binary(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, cl, cd0, k,
-                wing_area, airborne_dist, safety_coef, mu, path_angle, head_wind, thr_lim,
+def calc_mtom_binary(runway_length, initial_mass, alt_ft, aircraft_name, engine_name, rho, cl, cd0, k,
+                wing_area, airborne_dist, safety_coef, head_wind, thr_lim, mu=0.017, path_angle=0.0,
                 min_mass=60000, tol=1.0, iter_max=1.0e3, verbose=False):
     '''
      Uses binary search to estimate the Maximum Take-Off Mass (MTOM)
@@ -453,7 +455,7 @@ def mtom_binary(runway_length, initial_mass, alt_ft, aircraft_name, engine_name,
     while (high - low > tol) and iteration < iter_max:
         mid = (low + high) / 2
         todr = calc_todr(mid, rho, cl, cd0, k, wing_area, airborne_dist, aircraft_name, engine_name, alt_ft=alt_ft,
-                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim ) 
+                head_wind=head_wind, margin_coeff=safety_coef, thr_lim=thr_lim , mu=mu, theta=path_angle) 
 
         if verbose:
             print(f"[Iter {iteration}] Mass: {mid:.2f} kg, TODR: {todr:.2f} m")
@@ -466,3 +468,45 @@ def mtom_binary(runway_length, initial_mass, alt_ft, aircraft_name, engine_name,
         iteration += 1
 
     return low  # Conservative estimat
+
+
+def calc_roc(mass, aircraft_name, engine_name, alt_ft, rho, speed, cl, cd0, k, wing_area, thr_lim = 1.0): 
+    '''
+     Calculate Rate of Climb (ROC) in m/s, in steady climb configuration.
+     
+     Parameters
+     ----------
+     mass : float
+         Aircraft mass in kg
+     rho : float
+         Air density at altitude (kg/m^3)
+     speed : float
+         True airspeed (m/s)
+     cl : float
+         Lift coefficient
+     cd0 : float
+         Zero-lift drag coefficient
+     k : float
+         Induced drag factor
+     wing_area : float
+         Wing area (m^2)
+    speed : float
+        True airspeed (m/s)
+    
+     Returns
+     -------
+     roc_mps : float
+         Rate of Climb in m/s
+    '''
+
+    weight = mass * G
+    
+    #Thrust and Drag after take-off
+    thrust = get_thrust(aircraft_name=aircraft_name, engine_name=engine_name, speeds_ms=speed, alt_ft=alt_ft+35.0) * thr_lim
+    cd = cd0 + k * cl* cl
+    drag = 0.5 * rho * speed**2 * wing_area * cd
+
+    #excess power
+    excess_pow = (thrust - drag) * speed
+
+    return excess_pow / weight

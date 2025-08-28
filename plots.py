@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, './utils')
 from unit_converter import ComplexUnitConverter as conv
 from file_utils import install_requirements
+from tools import create_labels
 install_requirements(requirements_file='requirements.txt')
 print('---------------------------------------------------------------------------')
 from constants import *
@@ -107,26 +108,7 @@ otuput_file = f"todr_grid_{aircraft_name}_{engine_name}_{varying_params[0].lower
 df = pd.read_parquet(os.path.join(output_dir, otuput_file))
 
 #***************************************************************************
-plots_quant = ['TODR', 'MTOM']
-
-# ----------------------------------------------------------
-# Helper functions to create axis and cbar labels
-def create_labels(quantity_name):
-    """Returns a label with unit for the given physical quantity."""
-
-    unit_dict = {
-        "Temperature" : " [˚C]",
-        "Pressure"    : " [Pa]",
-        "Headwind"    : " [m/s]",
-        "Humidity"    : " [%]",
-        "TODR  "      : " [m] ",
-        "MTOM"        : " [kg] ",
-        "ROC"         : " [m/s]     "
-    }
-
-    label = quantity_name + unit_dict[quantity_name]
-
-    return label
+plots_quant = ['TODR', 'MTOM', 'ROC']
 
 # ----------------------------------------------------------
 # Plotting the heatmaps
@@ -146,6 +128,26 @@ for quantity in plots_quant:
     plt.savefig(os.path.join(img_dir,f"{quantity}_grid_thr{thr_lim}_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.pdf"))
     plt.show()
     plt.close()
+
+# ----------------------------------------------------------
+#Plotting MTOM limitation heatmap (w/ mask)
+quantity = 'MTOM_lim'
+heatmap_data = df.pivot(index= varying_params[1], columns= varying_params[0], values=quantity)
+#Apply NaN values mask
+mask = heatmap_data.isna()
+plt.figure(figsize=(10, 8))
+sns.heatmap(heatmap_data, annot=True, annot_kws={"size": 10, "color": 'black'}, fmt=".0f", 
+               cmap="summer",cbar_kws={'label': create_labels(quantity)}
+               )
+#plt.title("TODR table")
+plt.xlabel(create_labels(varying_params[0]))
+plt.ylabel(create_labels(varying_params[1]))
+plt.tight_layout()
+
+# Save to PDF
+plt.savefig(os.path.join(img_dir,f"{quantity}_grid_thr{thr_lim}_{aircraft_name}_{engine_name}_{varying_params[0].lower()}_{varying_params[1].lower()}.pdf"))
+plt.show()
+plt.close()
 
 
 '''

@@ -42,7 +42,7 @@ import subprocess
 from multiprocessing import Pool, cpu_count
 from itertools import product
 
-from performance_functions import take_off, calc_todr
+from performance_functions import take_off, calc_todr, calc_mtom, calc_roc
 from airport_utils import *
 from aircraft_utils import *
 from atm_functions import compute_air_density
@@ -222,25 +222,33 @@ def worker(params):
 
     try:
         # Compute TODR
-        todr = calc_todr(m=mass_max, rho=rho, cl=cl_best, cd0=cd0, k=k, w_area=wing_area,
+        take_off_data = calc_todr(m=mass_max, rho=rho, cl=cl_best, cd0=cd0, k=k, w_area=wing_area,
                      airborne_d=airborne_dist, aircraft_name=aircraft_name, engine_name=engine_name,
-                     alt_ft=airport_elev, head_wind=param_dict["Headwind"], thr_lim=thr_lim)
-        mtom = mtom(runaway_lenght=airport_l_m, initial_mass=mass_max, alt_ft=airport_elev,
+                     alt_ft=airport_elev, head_wind=param_dict["Headwind"], thr_lim=thr_lim, complete_data=True)
+        todr = take_off_data['TODR']
+        mtom = calc_mtom(runway_length=airport_l_m, initial_mass=mass_max, alt_ft=airport_elev,
                     aircraft_name=aircraft_name, engine_name=engine_name, rho=rho, cl=cl_best, cd0=cd0,
-                    k=k, w_area=wing_area, airborne_dist=airborne_dist, safety_coef=MARGIN_COEFF,
+                    k=k, wing_area=wing_area, airborne_dist=airborne_dist, safety_coef=MARGIN_COEFF,
                     head_wind=param_dict["Headwind"], thr_lim=thr_lim )
+        mtom_limitation = (mass_max - mtom) if (mass_max - mtom) > 0 else float("nan")
+        roc = calc_roc(mass_max, aircraft_name, engine_name, airport_elev, rho, take_off_data['finale_tas'], 
+                       cl_best, cd0, k, wing_area=wing_area, thr_lim=thr_lim)
     except Exception as e:
         print(f"[Warning] Failed at {param_dict} → {e}")
+        #Fallback values
         todr = float("nan")  # or np.nan
         mtom = float("nan")
-    
+        mtom_limitation = float("nan")
+        roc = float("nan")
     return {
         varying_params[0]: p1_val,
         varying_params[1]: p2_val,
         **selected_fix_val,
         "AirDensity": rho,
         "TODR": todr,
-        "MTOM": mtom
+        "MTOM": mtom,
+        "MTOM_lim": mtom_limitation,
+        "ROC" : roc
     }
 
 #***************************************************************************
